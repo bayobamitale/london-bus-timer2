@@ -57,7 +57,7 @@ export default function HomeScreen() {
             onPress={() => router.push('/(tabs)/search')}
           >
             <Ionicons name="search" size={20} color="#666" />
-            <Text style={styles.searchText}>Enter stop, route or postcode</Text>
+            <Text style={styles.searchText}>Enter bus number, stop or postcode</Text>
           </TouchableOpacity>
 
           {/* Location Button */}

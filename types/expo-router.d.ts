@@ -6,6 +6,9 @@ declare module 'expo-router' {
       '(tabs)': undefined;
       '(tabs)/search': undefined;
       '(tabs)/nearby': undefined;
+      '/bus/[line]': { line: string };
+      '/stop/[id]': undefined;
+      '/results': { q: string };
       // Add other routes here
     };
   }
