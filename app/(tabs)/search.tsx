@@ -1,103 +1,164 @@
-import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { FlatList, StyleSheet, Text, TextInput, TouchableOpacity, View, Keyboard } from 'react-native';
+import { router } from 'expo-router';
+import stopsData from '../data/stoppoints.json'; // your local stops JSON
+
+type Stop = {
+  id: string;
+  naptanId: string;
+  commonName: string;
+  lat: number;
+  lon: number;
+  stopLetter?: string;
+  indicator?: string;
+  modes: string[];
+};
 
 export default function SearchScreen() {
-  const router = useRouter();
   const [query, setQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<Stop[]>([]);
+  const [loading, setLoading] = useState(false);
 
-  const handleSearch = () => {
+  // Detect type of input: bus number, postcode, or stop name
+  function detectInputType(input: string) {
+    const trimmed = input.trim();
+    const busNumberPattern = /^[0-9]+[A-Za-z]?$/; // e.g., 24 or 25A
+    const postcodePattern = /^[A-Z]{1,2}[0-9R][0-9A-Z]? ?[0-9][A-Z]{2}$/i; // UK postcode
+
+    if (busNumberPattern.test(trimmed)) return 'bus';
+    if (postcodePattern.test(trimmed)) return 'postcode';
+    return 'stop';
+  }
+
+  async function handleSearch() {
     const trimmed = query.trim();
     if (!trimmed) return;
+    const type = detectInputType(trimmed);
 
-    const isBusNumber = /^[a-zA-Z]?\d+[a-zA-Z]?$/.test(trimmed);
+    Keyboard.dismiss();
+    setLoading(true);
+    setSearchResults([]);
 
-    if (isBusNumber) {
-      router.push({
-         pathname: '/bus/[line]',
-         params: { line: trimmed.toUpperCase() },
-      });
-    } else {
-      router.push({
-        pathname: '/results',
-        params: { q: trimmed },
-      });
+    try {
+      if (type === 'bus') {
+        // Navigate to bus line screen
+        router.push(`/bus/${trimmed.toUpperCase()}`);
+      } else if (type === 'stop') {
+        // Filter local stops JSON
+        const matches = (stopsData as Stop[]).filter((stop) =>
+          stop.commonName.toLowerCase().includes(trimmed.toLowerCase())
+        );
+        setSearchResults(matches);
+     } else if (type === 'postcode') {
+  try {
+    // Convert postcode to coordinates using postcodes.io
+    const geoRes = await fetch(
+      `https://api.postcodes.io/postcodes/${encodeURIComponent(trimmed)}`
+    );
+    const geoData = await geoRes.json();
+
+    if (!geoData || geoData.status !== 200 || !geoData.result) {
+      setSearchResults([]);
+      return;
     }
-  };
+
+    const { latitude, longitude } = geoData.result;
+
+    // Find nearby bus stops using TfL StopPoint API
+    const stopsRes = await fetch(
+      `https://api.tfl.gov.uk/StopPoint?lat=${latitude}&lon=${longitude}&stopTypes=NaptanPublicBusCoachTram&modes=bus&radius=500`
+    );
+    const stopsData = await stopsRes.json();
+
+    if (!Array.isArray(stopsData.stopPoints)) {
+      setSearchResults([]);
+      return;
+    }
+
+    const stops: Stop[] = stopsData.stopPoints.map((s: any) => ({
+      id: s.id,
+      naptanId: s.naptanId,
+      commonName: s.commonName,
+      lat: s.lat,
+      lon: s.lon,
+      indicator: s.indicator,
+      stopLetter: s.stopLetter,
+      modes: s.modes,
+    }));
+
+    setSearchResults(stops);
+  } catch (err) {
+    console.error("Postcode search error:", err);
+    setSearchResults([]);
+  }
+}
+
+
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  }
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Search</Text>
+      <Text style={styles.title}>Search Bus Stops</Text>
 
       <View style={styles.searchBox}>
-        <Ionicons name="search" size={20} color="#666" />
         <TextInput
           style={styles.input}
-          placeholder="Bus number, stop name or postcode"
+          placeholder="Enter bus number, stop, or postcode"
           value={query}
           onChangeText={setQuery}
-          returnKeyType="search"
           onSubmitEditing={handleSearch}
+          returnKeyType="search"
         />
+        <TouchableOpacity style={styles.button} onPress={handleSearch}>
+          <Text style={styles.buttonText}>Search</Text>
+        </TouchableOpacity>
       </View>
 
-      <TouchableOpacity style={styles.button} onPress={handleSearch}>
-        <Text style={styles.buttonText}>Search</Text>
-      </TouchableOpacity>
+      {loading && <Text style={{ marginTop: 16 }}>Loading...</Text>}
 
-      {/* Helper text */}
-      <View style={styles.help}>
-        <Text style={styles.helpText}>Examples:</Text>
-        <Text style={styles.helpText}>• 24</Text>
-        <Text style={styles.helpText}>• Oxford Circus</Text>
-        <Text style={styles.helpText}>• SW1A 1AA</Text>
-      </View>
+      <FlatList
+        data={searchResults}
+        keyExtractor={(item) => item.id}
+        style={{ marginTop: 16 }}
+        renderItem={({ item }) => (
+          <TouchableOpacity
+            style={styles.resultRow}
+            onPress={() => router.push(`/stop/${item.id}`)}
+          >
+            <Text style={styles.stopName}>{item.commonName}</Text>
+          </TouchableOpacity>
+        )}
+        ListEmptyComponent={
+          !loading ? (<Text style={{ marginTop: 16, color: '#666' }}>No results found</Text>) : null 
+        }
+      />
     </View>
   );
 }
+
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    padding: 16,
-    backgroundColor: '#fff',
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: '700',
-    marginBottom: 20,
-  },
-  searchBox: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#F3F4F6',
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-  },
+  container: { flex: 1, padding: 16, backgroundColor: '#fff' },
+  title: { fontSize: 24, fontWeight: '600', marginBottom: 16 },
+  searchBox: { flexDirection: 'row', alignItems: 'center' },
   input: {
     flex: 1,
-    marginLeft: 8,
-    fontSize: 16,
+    borderWidth: 1,
+    borderColor: '#ccc',
+    borderRadius: 8,
+    padding: 12,
+    marginRight: 8,
   },
-  button: {
-    marginTop: 16,
-    backgroundColor: '#E11D48',
-    paddingVertical: 14,
-    borderRadius: 12,
-    alignItems: 'center',
+  button: { backgroundColor: '#E11D48', padding: 12, borderRadius: 8 },
+  buttonText: { color: '#fff', fontWeight: '600' },
+  resultRow: {
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
   },
-  buttonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  help: {
-    marginTop: 24,
-  },
-  helpText: {
-    color: '#666',
-    fontSize: 14,
-    marginTop: 4,
-  },
+  stopName: { fontSize: 16 },
 });

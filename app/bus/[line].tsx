@@ -87,7 +87,10 @@ export default function BusLineScreen() {
               style={styles.stopRow}
               onPress={() => router.push({ pathname: '/stop/[id]', params: { id: item.id } })}
             >
-              <Text style={styles.stopName}>{item.commonName} ({item.indicator})</Text>
+              <Text style={styles.stopName}>
+                {item.commonName}
+                {item.indicator ? ` (${item.indicator})` : ''}
+              </Text>
               <Text style={styles.chevron}>›</Text>
             </TouchableOpacity>
           )}

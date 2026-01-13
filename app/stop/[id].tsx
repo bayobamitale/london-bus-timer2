@@ -9,12 +9,21 @@ type Arrival = {
   destinationName: string;
   direction: string;
   timeToStation: number; // seconds
+  stopPointName: string;
 };
+
+function formatArrivalTime(seconds: number) {
+  if (seconds <= 0) return 'Due';
+
+  const minutes = Math.floor(seconds / 60);
+  return minutes <= 0 ? 'Due' : `${minutes} min`;
+}
 
 export default function StopScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const [arrivals, setArrivals] = useState<Arrival[]>([]);
   const [loading, setLoading] = useState(true);
+  const [stopName, setStopName] = useState<string>('');
 
   useEffect(() => {
     if (!id) return;
@@ -22,24 +31,29 @@ export default function StopScreen() {
     const fetchArrivals = async () => {
       setLoading(true);
       try {
-        const res = await fetch(`https://api.tfl.gov.uk/StopPoint/${id}/Arrivals`);
+        const res = await fetch(
+          `https://api.tfl.gov.uk/StopPoint/${id}/Arrivals`
+        );
         const data = await res.json();
 
         if (!Array.isArray(data)) {
-          console.warn("Unexpected API response:", data);
           setArrivals([]);
-          setLoading(false);
           return;
         }
 
+        // Filter buses only
+        const buses = data.filter((a: any) => a.modeName === 'bus');
+
         // Sort by arrival time (soonest first)
-        const sorted: Arrival[] = data.sort(
-          (a: any, b: any) => a.timeToStation - b.timeToStation
+        const sorted: Arrival[] = [...buses].sort(
+          (a, b) => a.timeToStation - b.timeToStation
         );
 
         setArrivals(sorted);
+
+        if (sorted.length > 0) setStopName(sorted[0].stopPointName || '');
       } catch (err) {
-        console.error("Error fetching arrivals:", err);
+        console.error(err);
         setArrivals([]);
       } finally {
         setLoading(false);
@@ -51,7 +65,7 @@ export default function StopScreen() {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Stop ID: {id}</Text>
+      <Text style={styles.title}>{stopName || `Stop ID: ${id}`}</Text>
 
       {loading ? (
         <Text style={{ marginTop: 16 }}>Loading arrivals...</Text>
@@ -66,10 +80,14 @@ export default function StopScreen() {
           renderItem={({ item }) => (
             <View style={styles.arrivalRow}>
               <Text style={styles.line}>{item.lineName}</Text>
-              <Text style={styles.destination}>→ {item.destinationName}</Text>
-              <Text style={styles.time}>
-                {Math.round(item.timeToStation / 60)} min
+              <Text
+                style={styles.destination}
+                numberOfLines={1}
+                ellipsizeMode="tail"
+              >
+                → {item.destinationName}
               </Text>
+              <Text style={styles.time}>{formatArrivalTime(item.timeToStation)}</Text>
             </View>
           )}
         />
@@ -91,12 +109,27 @@ const styles = StyleSheet.create({
   },
   arrivalRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    alignItems: 'center',
     paddingVertical: 12,
     borderBottomWidth: 1,
     borderBottomColor: '#eee',
   },
-  line: { fontSize: 16, fontWeight: '600' },
-  destination: { fontSize: 16, color: '#333' },
-  time: { fontSize: 16, color: '#E11D48', fontWeight: '600' },
+  line: {
+    width: 50, // fixed width for bus line
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  destination: {
+    flex: 1, // takes remaining space
+    fontSize: 16,
+    color: '#333',
+    marginHorizontal: 8,
+  },
+  time: {
+    width: 60, // fixed width for time
+    fontSize: 16,
+    color: '#E11D48',
+    fontWeight: '600',
+    textAlign: 'right',
+  },
 });
