@@ -13,7 +13,9 @@ type Stop = {
   indicator?: string;
   modes: string[];
 };
-
+function normalizePostcode(input: string) {
+  return input.trim().toUpperCase().replace(/\s/g, '');
+}
 export default function SearchScreen() {
   const [query, setQuery] = useState('');
   const [searchResults, setSearchResults] = useState<Stop[]>([]);
@@ -50,6 +52,7 @@ export default function SearchScreen() {
         );
         setSearchResults(matches);
      } else if (type === 'postcode') {
+       const postcode = normalizePostcode(trimmed);
   try {
     // Convert postcode to coordinates using postcodes.io
     const geoRes = await fetch(

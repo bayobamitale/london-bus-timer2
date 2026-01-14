@@ -29,8 +29,8 @@ export default function TabLayout() {
             case 'favourites':
               iconName = 'star';
               break;
-            case 'settings':
-              iconName = 'settings';
+            case 'more':
+              iconName = 'ellipsis-horizontal';
               break;
             default:
               iconName = 'help';
@@ -65,31 +65,11 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="settings"
+        name="more"
         options={{
-          title:'Settings'
+          title:'More'
         }}
       />
-      {/*<Tabs
-      screenOptions={{
-        tabBarActiveTintColor: Colors[colorScheme ?? 'light'].tint,
-        headerShown: false,
-        tabBarButton: HapticTab,
-      }}>
-      <Tabs.Screen
-        name="index"
-        options={{
-          title: 'Home',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="house.fill" color={color} />,
-        }}
-      />
-      <Tabs.Screen
-        name="explore"
-        options={{
-          title: 'Explore',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="paperplane.fill" color={color} />,
-        }}
-      />*/}
     </Tabs>
     
   );

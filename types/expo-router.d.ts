@@ -9,6 +9,7 @@ declare module 'expo-router' {
       '/bus/[line]': { line: string };
       '/stop/[id]': undefined;
       '/results': { q: string };
+      '/(tabs)/more/about': undefined;
       // Add other routes here
     };
   }

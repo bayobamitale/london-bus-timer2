@@ -115,18 +115,18 @@ const styles = StyleSheet.create({
     borderBottomColor: '#eee',
   },
   line: {
-    width: 50, // fixed width for bus line
+    width: 50,
     fontSize: 16,
     fontWeight: '600',
   },
   destination: {
-    flex: 1, // takes remaining space
+    flex: 1,
     fontSize: 16,
     color: '#333',
     marginHorizontal: 8,
   },
   time: {
-    width: 60, // fixed width for time
+    width: 60,
     fontSize: 16,
     color: '#E11D48',
     fontWeight: '600',
