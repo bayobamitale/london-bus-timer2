@@ -29,8 +29,8 @@ export default function TabLayout() {
             case 'favourites':
               iconName = 'star';
               break;
-            case 'more':
-              iconName = 'ellipsis-horizontal';
+            case 'details':
+              iconName = 'list-outline';
               break;
             default:
               iconName = 'help';
@@ -65,9 +65,9 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="more"
+        name="details"
         options={{
-          title:'More'
+          title:'Details'
         }}
       />
     </Tabs>

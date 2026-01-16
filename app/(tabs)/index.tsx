@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useLayoutEffect } from 'react';
 import {
   FlatList,
   StyleSheet,
@@ -14,6 +14,9 @@ import CurrentLocationSummary from '@/components/CurrentLocationSummary';
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { useFavorites } from '@/context/favoritesContext';
+import HeaderMenu from '@/components/HeaderMenu';
+import { Stack } from 'expo-router';
+
 
 type Stop = {
   id: string;
@@ -44,7 +47,6 @@ type NearestStop = {
 export default function HomeScreen() {
   const router = useRouter();
   const { favorites } = useFavorites();
-
   const [nearestStop, setNearestStop] = useState<NearestStop | null>(null);
   const [location, setLocation] = useState<Location.LocationObject | null>(null);
   const [arrivals, setArrivals] = useState<Arrival[]>([]);
@@ -139,8 +141,16 @@ export default function HomeScreen() {
       setArrivals([]);
     }
   };
-
+  
   return (
+    <>
+      {/* Header */}
+      <Stack.Screen
+        options={{
+          headerTitle: 'London Bus Timer',
+          headerRight: () => <HeaderMenu />,
+        }}
+      />
     <FlatList
       data={arrivals}
       keyExtractor={item => item.id}
@@ -282,7 +292,7 @@ export default function HomeScreen() {
       }
       contentContainerStyle={{ padding: 16 }}
     />
-    
+   </> 
   );
 }
 
