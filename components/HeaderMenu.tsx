@@ -1,48 +1,53 @@
-import React, { useState } from 'react';
-import { View } from 'react-native';
-import { Menu } from 'react-native-paper';
-import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import React, { useState, useCallback } from 'react';
+import { Menu, IconButton, Divider } from 'react-native-paper';
+import { useRouter, useFocusEffect } from 'expo-router';
 
 export default function HeaderMenu() {
-  const [visible, setVisible] = useState(false);
+  const [visible, setVisible] = React.useState(false);
   const router = useRouter();
 
+  const openMenu = () => setVisible(true);
+  const closeMenu = () => setVisible(false);
+
+  useFocusEffect(
+    useCallback(() => {
+      setVisible(false);
+    }, [])
+  );
+
   return (
-    <View>
-      <Menu
-        visible={visible}
-        onDismiss={() => setVisible(false)}
-        anchor={
-          <Ionicons
-            name="ellipsis-vertical"
-            size={22}
-            onPress={() => setVisible(true)}
-          />
-        }
-      >
-        <Menu.Item
-          title="About"
-          onPress={() => {
-            setVisible(false);
-            router.push('/about');
-          }}
+    <Menu
+      visible={visible}
+      onDismiss={closeMenu}
+      anchor={
+        <IconButton
+          icon="dots-vertical"
+          size={22}
+          onPress={openMenu}
         />
-        {/*<Menu.Item
-          title="How to use"
-          onPress={() => {
-            setVisible(false);
-            router.push('/help');
-          }}
-        />
-        <Menu.Item
-          title="Privacy"
-          onPress={() => {
-            setVisible(false);
-            router.push('/privacy');
-          }}
-        />*/}
-      </Menu>
-    </View>
+      }
+    >
+      {/* SETTINGS */}
+      <Menu.Item
+        leadingIcon="cog"
+        title="Settings"
+        onPress={() => {
+          closeMenu();
+          router.push('/settings');
+        }}
+      />
+
+      <Divider />
+
+      {/* ABOUT */}
+      <Menu.Item
+        leadingIcon="information-outline"
+        title="About"
+        onPress={() => {
+          closeMenu();
+          router.push('/about');
+        }}
+      />
+    </Menu>
   );
 }

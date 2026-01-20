@@ -14,23 +14,34 @@ type FavoritesContextType = {
   favorites: Favorite[];
   addFavorite: (fav: Favorite) => void;
   removeFavorite: (id: string) => void;
+  clearFavorites: () => void;
+
 };
 
-const FavoritesContext = createContext<FavoritesContextType | null>(null);
+const FavoritesContext = createContext<FavoritesContextType | undefined>(
+  undefined
+);
 
 export function FavoritesProvider({ children }: { children: React.ReactNode }) {
   const [favorites, setFavorites] = useState<Favorite[]>([]);
 
   const addFavorite = (fav: Favorite) => {
-    setFavorites(prev => [...prev, fav]);
+    setFavorites((prev) => {
+      // prevent duplicates
+      if (prev.some((f) => f.id === fav.id)) return prev;
+      return [...prev, fav];
+    });
   };
 
   const removeFavorite = (id: string) => {
     setFavorites(prev => prev.filter(f => f.id !== id));
   };
+  const clearFavorites = () => {
+    setFavorites([]);
+  };
 
   return (
-    <FavoritesContext.Provider value={{ favorites, addFavorite, removeFavorite }}>
+    <FavoritesContext.Provider value={{ favorites, addFavorite, removeFavorite, clearFavorites, }}>
       {children}
     </FavoritesContext.Provider>
   );
