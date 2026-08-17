@@ -1,6 +1,7 @@
-import React, { useState, useCallback } from 'react';
+import React, { useCallback } from 'react';
 import { Menu, IconButton, Divider } from 'react-native-paper';
 import { useRouter, useFocusEffect } from 'expo-router';
+import { Brand } from '@/constants/theme';
 
 export default function HeaderMenu() {
   const [visible, setVisible] = React.useState(false);
@@ -23,6 +24,7 @@ export default function HeaderMenu() {
         <IconButton
           icon="dots-vertical"
           size={22}
+          iconColor={Brand.navy}
           onPress={openMenu}
         />
       }

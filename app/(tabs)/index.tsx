@@ -1,42 +1,21 @@
-import React, { useState, useLayoutEffect } from 'react';
+import React, { useState } from 'react';
 import {
   FlatList,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
-  ActivityIndicator,
 } from 'react-native';
-import { useRouter } from 'expo-router';
-import * as Location from 'expo-location';
+import { Stack, useRouter } from 'expo-router';
+import { getCurrentLocation, getLocationErrorMessage } from '@/utils/location';
+import { formatArrivalTime, getStopArrivals, type Arrival } from '@/services/tfl';
 import stoppoints from '../data/stoppoints.json';
 import CurrentLocationSummary from '@/components/CurrentLocationSummary';
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { useFavorites } from '@/context/favoritesContext';
 import HeaderMenu from '@/components/HeaderMenu';
-import { Stack } from 'expo-router';
-
-
-type Stop = {
-  id: string;
-  naptanId: string;
-  commonName: string;
-  lat: number;
-  lon: number;
-  stopLetter?: string;
-  indicator?: string;
-  modes: string[];
-};
-
-type Arrival = {
-  id: string;
-  lineName: string;
-  destinationName: string;
-  stopLetter?: string;
-  direction: string;
-  timeToStation: number;
-};
+import { Brand } from '@/constants/theme';
 
 type NearestStop = {
   name: string;
@@ -48,10 +27,10 @@ export default function HomeScreen() {
   const router = useRouter();
   const { favorites } = useFavorites();
   const [nearestStop, setNearestStop] = useState<NearestStop | null>(null);
-  const [location, setLocation] = useState<Location.LocationObject | null>(null);
   const [arrivals, setArrivals] = useState<Arrival[]>([]);
   const [showLocation, setShowLocation] = useState(false);
   const [loadingArrivals, setLoadingArrivals] = useState(false);
+  const [locationError, setLocationError] = useState<string | null>(null);
 
   // Haversine formula
   const getDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
@@ -67,35 +46,10 @@ export default function HomeScreen() {
     return R * c;
   };
 
-  const formatArrivalTime = (seconds: number) => {
-    if (seconds <= 0) return 'Due';
-    const minutes = Math.floor(seconds / 60);
-    return minutes <= 0 ? 'Due' : `${minutes} min`;
-  };
-
   const fetchArrivals = async (stopId: string) => {
     setLoadingArrivals(true);
     try {
-      const res = await fetch(`https://api.tfl.gov.uk/StopPoint/${stopId}/Arrivals`);
-      const data = await res.json();
-      if (!Array.isArray(data)) {
-        setArrivals([]);
-        return;
-      }
-
-      const buses: Arrival[] = data
-        .filter((a: any) => a.modeName === 'bus')
-        .map((a: any) => ({
-          id: a.id,
-          lineName: a.lineName,
-          destinationName: a.destinationName,
-          stopLetter: a.stationLetter || a.stopLetter,
-          direction: a.direction,
-          timeToStation: a.timeToStation,
-        }))
-        .sort((a, b) => a.timeToStation - b.timeToStation);
-
-      setArrivals(buses);
+      setArrivals(await getStopArrivals(stopId));
     } catch (err) {
       console.error(err);
       setArrivals([]);
@@ -106,14 +60,17 @@ export default function HomeScreen() {
 
   const handleUseLocation = async () => {
     setShowLocation(true);
-    const { status } = await Location.requestForegroundPermissionsAsync();
-    if (status !== 'granted') {
-      alert('Permission to access location denied!');
+    setLocationError(null);
+
+    const result = await getCurrentLocation();
+    if (result.status !== 'granted') {
+      setLocationError(getLocationErrorMessage(result.status));
+      setNearestStop(null);
+      setArrivals([]);
       return;
     }
 
-    const loc = await Location.getCurrentPositionAsync({});
-    setLocation(loc);
+    const loc = result.location;
 
     const nearbyStops = stoppoints
       .map(stop => ({
@@ -180,7 +137,12 @@ export default function HomeScreen() {
               style={styles.reactLogo}
               contentFit="contain"
             />
-            <Text style={styles.title}>London Bus Timer</Text>
+            <View style={styles.eyebrow}>
+              <View style={styles.liveDot} />
+              <Text style={styles.eyebrowText}>LIVE LONDON BUS TIMES</Text>
+            </View>
+            <Text style={styles.title}>Where are you going?</Text>
+            <Text style={styles.subtitle}>Find a stop and see what’s arriving next.</Text>
           </View>
 
           {/* Search */}
@@ -188,24 +150,35 @@ export default function HomeScreen() {
             style={styles.searchBox}
             onPress={() => router.push('/(tabs)/search')}
           >
-            <Ionicons name="search" size={20} color="#666" />
+            <Ionicons name="search" size={21} color={Brand.textMuted} />
             <Text style={styles.searchText}>Enter bus number, stop or postcode</Text>
+            <Ionicons name="arrow-forward" size={18} color={Brand.red} />
           </TouchableOpacity>
 
           {/* Location */}
           <TouchableOpacity style={styles.locationBtn} onPress={handleUseLocation}>
-            <Ionicons name="location-outline" size={20} color="#fff" />
-            <Text style={styles.locationText}>Use Current Location</Text>
+            <Ionicons name="navigate" size={19} color="#fff" />
+            <Text style={styles.locationText}>Find buses near me</Text>
           </TouchableOpacity>
 
-          {showLocation && <CurrentLocationSummary />}
+          {showLocation && !locationError && <CurrentLocationSummary />}
+
+          {locationError && (
+            <View style={styles.locationErrorRow}>
+              <Ionicons name="alert-circle-outline" size={18} color="#B91C1C" />
+              <Text style={styles.locationErrorText}>{locationError}</Text>
+            </View>
+          )}
 
           {/* Nearest Stop */}
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Nearest Stop (within 200m)</Text>
+              <View>
+                <Text style={styles.sectionTitle}>Nearest stop</Text>
+                <Text style={styles.sectionCaption}>Within a short walk</Text>
+              </View>
               <TouchableOpacity onPress={() => router.push('/(tabs)/nearby')}>
-                <Text style={styles.link}>View More</Text>
+                <Text style={styles.link}>View all</Text>
               </TouchableOpacity>
             </View>
             <View style={styles.card}>
@@ -215,16 +188,21 @@ export default function HomeScreen() {
                   <Text style={styles.distance}>{Math.round(nearestStop.distance)}m away</Text>
                 </TouchableOpacity>
               ) : (
-                <Text style={{ color: '#666' }}>No stops within 200 meters</Text>
+                <View style={styles.emptyRow}>
+                  <View style={styles.emptyIcon}>
+                    <Ionicons name="bus-outline" size={20} color={Brand.red} />
+                  </View>
+                  <Text style={styles.emptyText}>Use your location to find nearby stops</Text>
+                </View>
               )}
             </View>
           </View>
 
           {/* Favorites */}
 <View style={styles.section}>
-  <Text style={styles.sectionTitle}>Favorites</Text>
+  <Text style={styles.sectionTitle}>Your favourites</Text>
   {favorites.length === 0 ? (
-    <Text style={{ color: '#666', marginVertical: 8 }}>No favorites yet</Text>
+    <Text style={styles.emptyText}>Save a bus or stop for quicker access.</Text>
   ) : (
     <FlatList
       horizontal
@@ -239,7 +217,7 @@ export default function HomeScreen() {
             if (item.type === 'bus' && item.line) router.push(`/bus/${item.line}`);
           }}
         >
-          <Ionicons name={item.icon as any} size={18} color="#333" />
+          <Ionicons name={item.icon as any} size={18} color={Brand.red} />
           <Text style={styles.favoriteText}>{item.title}</Text>
         </TouchableOpacity>
       )}
@@ -249,7 +227,7 @@ export default function HomeScreen() {
 
 
           {/* Arrivals Placeholder */}
-          <Text style={{ marginVertical: 12, fontWeight: '600' }}>Arrivals:</Text>
+          <Text style={styles.arrivalsTitle}>Live arrivals</Text>
           {loadingArrivals && (
             <View>
               {[1, 2, 3].map(i => (
@@ -286,64 +264,129 @@ export default function HomeScreen() {
 )}
 {/* Show message if no arrivals */}
 {!loadingArrivals && arrivals.length === 0 && (
-  <Text style={{ color: '#666', marginVertical: 8 }}>No arrivals available</Text>
+  <Text style={styles.emptyText}>Choose a nearby stop to see live arrivals.</Text>
 )}
         </>
       }
-      contentContainerStyle={{ padding: 16 }}
+      contentContainerStyle={styles.content}
+      showsVerticalScrollIndicator={false}
     />
    </> 
   );
 }
 
 const styles = StyleSheet.create({
-  header: { alignItems: 'center', marginBottom: 12 },
-  reactLogo: { width: 100, height: 80 },
-  title: { fontSize: 22, fontWeight: '700', marginTop: 8 },
+  content: { padding: 16, paddingBottom: 28, backgroundColor: Brand.cream },
+  header: { alignItems: 'center', paddingTop: 4, marginBottom: 22 },
+  reactLogo: { width: 112, height: 82 },
+  eyebrow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FDECEB',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
+    marginTop: 8,
+  },
+  liveDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: Brand.red, marginRight: 7 },
+  eyebrowText: { color: Brand.redDark, fontSize: 11, fontWeight: '800', letterSpacing: 0.6 },
+  title: { color: Brand.navy, fontSize: 28, fontWeight: '800', marginTop: 12, letterSpacing: -0.5 },
+  subtitle: { color: Brand.textMuted, fontSize: 14, marginTop: 5, textAlign: 'center' },
   searchBox: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#fff',
-    padding: 14,
-    borderRadius: 10,
-    marginBottom: 12,
+    backgroundColor: Brand.surface,
+    paddingHorizontal: 16,
+    minHeight: 56,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: Brand.border,
+    marginBottom: 10,
   },
-  searchText: { marginLeft: 10, color: '#666' },
+  searchText: { marginLeft: 10, color: Brand.textMuted, flex: 1, fontSize: 14 },
   locationBtn: {
     flexDirection: 'row',
-    backgroundColor: '#007AFF',
-    padding: 14,
-    borderRadius: 10,
+    backgroundColor: Brand.red,
+    minHeight: 52,
+    borderRadius: 16,
     justifyContent: 'center',
     alignItems: 'center',
+    marginBottom: 10,
+  },
+  locationText: { color: '#fff', marginLeft: 8, fontWeight: '800', fontSize: 15 },
+  locationErrorRow: { flexDirection: 'row', alignItems: 'center', marginVertical: 8 },
+  locationErrorText: { color: Brand.danger, marginLeft: 6, flex: 1 },
+  section: { marginTop: 22 },
+  sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
+  sectionTitle: { color: Brand.navy, fontSize: 19, fontWeight: '800', letterSpacing: -0.2 },
+  sectionCaption: { color: Brand.textMuted, fontSize: 12, marginTop: 2 },
+  arrivalsTitle: { color: Brand.navy, fontSize: 19, fontWeight: '800', marginTop: 22, marginBottom: 10 },
+  link: { color: Brand.red, fontWeight: '700' },
+  card: {
+    backgroundColor: Brand.surface,
+    padding: 16,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: Brand.border,
     marginBottom: 12,
   },
-  locationText: { color: '#fff', marginLeft: 8, fontWeight: '600' },
-  section: { marginTop: 10 },
-  sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
-  sectionTitle: { fontSize: 18, fontWeight: '600' },
-  link: { color: '#007AFF', fontWeight: '500' },
-  card: { backgroundColor: '#fff', padding: 14, borderRadius: 12, marginBottom: 12 },
-  stopName: { fontSize: 16, fontWeight: '600' },
-  distance: { color: '#666', marginTop: 4 },
-
-  favoriteCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', padding: 14, borderRadius: 10, marginRight: 10 },
-  favoriteText: { marginLeft: 6, fontWeight: '500' },
-
-  favoritesPlaceholder: { flexDirection: 'row', marginVertical: 8 },
-  favoritePlaceholderCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#eee', padding: 14, borderRadius: 10, marginRight: 10 },
-  iconPlaceholder: { width: 24, height: 24, backgroundColor: '#ccc', borderRadius: 12 },
-  textPlaceholder: { flex: 1, height: 14, backgroundColor: '#ddd', borderRadius: 4, marginLeft: 8 },
-
-  arrivalRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 12, paddingHorizontal: 10, backgroundColor: '#fff', borderRadius: 10, marginBottom: 8, alignItems: 'flex-start' },
+  stopName: { color: Brand.navy, fontSize: 16, fontWeight: '700' },
+  distance: { color: Brand.textMuted, marginTop: 4 },
+  emptyRow: { flexDirection: 'row', alignItems: 'center' },
+  emptyIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: '#FDECEB',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 10,
+  },
+  emptyText: { color: Brand.textMuted, marginVertical: 8, lineHeight: 20 },
+  favoriteCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Brand.surface,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: Brand.border,
+    marginRight: 10,
+  },
+  favoriteText: { color: Brand.text, marginLeft: 7, fontWeight: '700' },
+  arrivalRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    padding: 14,
+    backgroundColor: Brand.surface,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: Brand.border,
+    marginBottom: 9,
+    alignItems: 'center',
+  },
   arrivalTextContainer: { flex: 1, paddingRight: 10 },
-  timeContainer: { width: 50, alignItems: 'flex-end' },
-  route: { fontWeight: '600', marginBottom: 2 },
-  destination: { color: '#444', flexWrap: 'wrap' },
-  direction: { fontSize: 12, color: '#666', marginTop: 2 },
-  time: { color: '#007AFF', fontWeight: '600' },
-
-  arrivalPlaceholderRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 12, paddingHorizontal: 10, backgroundColor: '#eee', borderRadius: 10, marginBottom: 8 },
-  arrivalTextPlaceholder: { flex: 1, height: 14, backgroundColor: '#ddd', borderRadius: 4 },
-  arrivalTimePlaceholder: { width: 50, height: 14, backgroundColor: '#ccc', borderRadius: 4 },
+  timeContainer: { minWidth: 62, alignItems: 'flex-end' },
+  route: { color: Brand.navy, fontSize: 17, fontWeight: '800', marginBottom: 2 },
+  destination: { color: Brand.text, flexWrap: 'wrap' },
+  direction: { fontSize: 12, color: Brand.textMuted, marginTop: 3 },
+  time: {
+    color: Brand.success,
+    fontWeight: '800',
+    backgroundColor: '#E8F5EF',
+    paddingHorizontal: 9,
+    paddingVertical: 6,
+    borderRadius: 999,
+  },
+  arrivalPlaceholderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    padding: 16,
+    backgroundColor: Brand.surfaceMuted,
+    borderRadius: 16,
+    marginBottom: 8,
+  },
+  arrivalTextPlaceholder: { flex: 1, height: 14, backgroundColor: Brand.border, borderRadius: 4 },
+  arrivalTimePlaceholder: { width: 50, height: 14, backgroundColor: '#C9C2B8', borderRadius: 4 },
 });

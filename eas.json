@@ -1,0 +1,29 @@
+{
+  "cli": {
+    "version": ">= 22.0.0",
+    "appVersionSource": "remote"
+  },
+  "build": {
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal"
+    },
+    "preview": {
+      "distribution": "internal",
+      "env": {
+        "EXPO_PUBLIC_ADMOB_ANDROID_BANNER_ID": "ca-app-pub-8934496354282637/3268978930",
+        "EXPO_PUBLIC_ADMOB_IOS_BANNER_ID": "ca-app-pub-8934496354282637/1439328845"
+      }
+    },
+    "production": {
+      "autoIncrement": true,
+      "env": {
+        "EXPO_PUBLIC_ADMOB_ANDROID_BANNER_ID": "ca-app-pub-8934496354282637/3268978930",
+        "EXPO_PUBLIC_ADMOB_IOS_BANNER_ID": "ca-app-pub-8934496354282637/1439328845"
+      }
+    }
+  },
+  "submit": {
+    "production": {}
+  }
+}

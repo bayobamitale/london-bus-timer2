@@ -5,10 +5,10 @@ import {
   Switch,
   List,
   Divider,
-  Button,
 } from 'react-native-paper';
 import * as Location from 'expo-location';
 import { useFavorites } from '@/context/favoritesContext';
+import { Brand } from '@/constants/theme';
 
 export default function SettingsScreen() {
   const { clearFavorites, favorites } = useFavorites();
@@ -56,10 +56,11 @@ export default function SettingsScreen() {
       <Text variant="titleLarge" style={styles.title}>
         Settings
       </Text>
+      <Text style={styles.subtitle}>Personalise your bus experience.</Text>
 
       {/* LOCATION */}
-      <List.Section>
-        <List.Subheader>Location</List.Subheader>
+      <List.Section style={styles.section}>
+        <List.Subheader style={styles.subheader}>Location</List.Subheader>
 
         <List.Item
           title="Use current location"
@@ -74,11 +75,11 @@ export default function SettingsScreen() {
         />
       </List.Section>
 
-      <Divider />
+      <Divider style={styles.divider} />
 
       {/* NOTIFICATIONS */}
-      <List.Section>
-        <List.Subheader>Notifications</List.Subheader>
+      <List.Section style={styles.section}>
+        <List.Subheader style={styles.subheader}>Notifications</List.Subheader>
 
         <List.Item
           title="Bus arrival alerts"
@@ -93,11 +94,11 @@ export default function SettingsScreen() {
         />
       </List.Section>
 
-      <Divider />
+      <Divider style={styles.divider} />
 
       {/* FAVORITES */}
-      <List.Section>
-        <List.Subheader>Favorites</List.Subheader>
+      <List.Section style={styles.section}>
+        <List.Subheader style={styles.subheader}>Favourites</List.Subheader>
 
         <List.Item
           title="Clear all favorites"
@@ -114,10 +115,23 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     padding: 16,
-    backgroundColor: '#fff',
+    backgroundColor: Brand.cream,
   },
   title: {
-    fontWeight: '700',
-    marginBottom: 8,
+    color: Brand.navy,
+    fontSize: 28,
+    fontWeight: '800',
+    marginTop: 6,
   },
+  subtitle: { color: Brand.textMuted, marginTop: 4, marginBottom: 14 },
+  section: {
+    backgroundColor: Brand.surface,
+    borderWidth: 1,
+    borderColor: Brand.border,
+    borderRadius: 16,
+    overflow: 'hidden',
+    marginBottom: 12,
+  },
+  subheader: { color: Brand.red, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.6 },
+  divider: { display: 'none' },
 });

@@ -1,99 +1,107 @@
 import { useEffect, useState } from 'react';
 import { router, useLocalSearchParams } from 'expo-router';
-import { FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import rawStopsData from '../data/stoppoints.json';
-import rawRouteData from '../data/route.json';
-
-type Stop = {
-  id: string;
-  commonName: string;
-  lat: number;
-  lon: number;
-  indicator: string; // Stop letter
-  lineGroup?: { lineIdentifier: string[]; direction?: string }[];
-};
-
-type RouteSection = {
-  direction: 'inbound' | 'outbound';
-  stopIds: string[]; // Array of stop IDs in order for that direction
-};
-
-type RouteData = {
-  routeSections: RouteSection[];
-};
+import { ActivityIndicator, SectionList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { Brand } from '@/constants/theme';
+import {
+  getLineDirectionStops,
+  type LineDirectionStops,
+} from '@/services/tfl';
 
 export default function BusLineScreen() {
   const { line } = useLocalSearchParams<{ line: string }>();
-  const [direction, setDirection] = useState<'Inbound' | 'Outbound' | null>(null);
-  const [stops, setStops] = useState<Stop[]>([]);
-
-  // Parse JSON
-  const stoppoints: Stop[] = (rawStopsData as any).default || rawStopsData;
-  const routeData: RouteData = (rawRouteData as any).default || rawRouteData;
+  const [directions, setDirections] = useState<LineDirectionStops[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-  if (!direction || !line) return;
+    if (!line) return;
 
-  // Filter stops for this line
-  const filteredStops = stoppoints
-    .filter((stop) =>
-      stop.lineGroup?.some((group) =>
-        group.lineIdentifier.includes(line)
-      )
-    );
+    const loadRoute = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        setDirections(await getLineDirectionStops(line));
+      } catch (err) {
+        console.error('Failed to load route stops', err);
+        setError('Unable to load this route. Please try again.');
+        setDirections([]);
+      } finally {
+        setLoading(false);
+      }
+    };
 
- 
-  const orderedStops = [...filteredStops].sort((a, b) => {
-  const aInd = a.indicator ?? ''; // fallback to empty string
-  const bInd = b.indicator ?? '';
+    loadRoute();
+  }, [line]);
 
-  return direction === 'Inbound'
-    ? aInd.localeCompare(bInd)
-    : bInd.localeCompare(aInd); // reverse for Outbound
-});
-
-  setStops(orderedStops);
-}, [direction, line]);
-
-  if (!direction) {
+  if (loading) {
     return (
-      <View style={styles.container}>
-        <Text style={styles.title}>Bus {line}</Text>
-        <Text style={styles.subtitle}>Select direction:</Text>
-
-        <TouchableOpacity style={styles.button} onPress={() => setDirection('Inbound')}>
-          <Text style={styles.buttonText}>Inbound</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.button} onPress={() => setDirection('Outbound')}>
-          <Text style={styles.buttonText}>Outbound</Text>
-        </TouchableOpacity>
+      <View style={styles.loadingState}>
+        <ActivityIndicator size="large" color={Brand.red} />
+        <Text style={styles.loadingText}>Loading both directions…</Text>
       </View>
     );
   }
 
+  const sections = directions.map((item) => ({
+    title: item.direction === 'inbound' ? 'Inbound' : 'Outbound',
+    direction: item.direction,
+    data: item.stops,
+  }));
+  const hasStops = directions.some((item) => item.stops.length > 0);
+
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Bus {line} - {direction}</Text>
-
-      {stops.length === 0 ? (
-        <Text style={{ color: '#666', marginTop: 16 }}>No stops found for this direction.</Text>
+      {error || !hasStops ? (
+        <View style={styles.emptyState}>
+          <Ionicons name="git-branch-outline" size={34} color={Brand.red} />
+          <Text style={styles.emptyTitle}>Route stops unavailable</Text>
+          <Text style={styles.emptyText}>{error || 'No stops were found for this route.'}</Text>
+        </View>
       ) : (
-        <FlatList
-          data={stops}
-          keyExtractor={(item) => item.id}
-          renderItem={({ item }) => (
+        <SectionList
+          sections={sections}
+          keyExtractor={(item, index) => `${item.id}-${index}`}
+          ListHeaderComponent={
+            <View style={styles.header}>
+              <Text style={styles.eyebrow}>ROUTE {line}</Text>
+              <Text style={styles.title}>Stops in both directions</Text>
+              <Text style={styles.subtitle}>
+                Browse inbound and outbound stops without choosing first.
+              </Text>
+            </View>
+          }
+          renderSectionHeader={({ section }) => (
+            <View style={styles.sectionHeader}>
+              <View style={styles.directionIcon}>
+                <Ionicons
+                  name={section.direction === 'inbound' ? 'arrow-down' : 'arrow-up'}
+                  size={17}
+                  color="#fff"
+                />
+              </View>
+              <Text style={styles.sectionTitle}>{section.title}</Text>
+              <Text style={styles.stopCount}>{section.data.length} stops</Text>
+            </View>
+          )}
+          renderItem={({ item, index }) => (
             <TouchableOpacity
               style={styles.stopRow}
               onPress={() => router.push({ pathname: '/stop/[id]', params: { id: item.id } })}
             >
+              <View style={styles.stopIndex}>
+                <Text style={styles.stopIndexText}>{index + 1}</Text>
+              </View>
               <Text style={styles.stopName}>
-                {item.commonName}
-                {item.indicator ? ` (${item.indicator})` : ''}
+                {item.name}
+                {item.stopLetter ? ` (${item.stopLetter})` : ''}
               </Text>
-              <Text style={styles.chevron}>›</Text>
+              <Ionicons name="chevron-forward" size={19} color={Brand.textMuted} />
             </TouchableOpacity>
           )}
+          stickySectionHeadersEnabled
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.listContent}
         />
       )}
     </View>
@@ -101,24 +109,63 @@ export default function BusLineScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#fff', padding: 16 },
-  title: { fontSize: 24, fontWeight: '600', marginBottom: 16 },
-  subtitle: { fontSize: 18, marginBottom: 12 },
-  button: {
-    paddingVertical: 16,
-    backgroundColor: '#E11D48',
-    marginVertical: 8,
-    borderRadius: 12,
+  container: { flex: 1, backgroundColor: Brand.cream },
+  listContent: { padding: 16, paddingBottom: 28 },
+  header: { marginBottom: 20 },
+  eyebrow: { color: Brand.red, fontSize: 11, fontWeight: '800', letterSpacing: 0.8, marginTop: 6 },
+  title: { color: Brand.navy, fontSize: 28, fontWeight: '800', marginTop: 6, letterSpacing: -0.5 },
+  subtitle: { color: Brand.textMuted, fontSize: 15, lineHeight: 21, marginTop: 6 },
+  sectionHeader: {
+    flexDirection: 'row',
     alignItems: 'center',
+    backgroundColor: Brand.surface,
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+    marginTop: 8,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: Brand.border,
   },
-  buttonText: { color: '#fff', fontSize: 16, fontWeight: '600' },
+  directionIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: Brand.red,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  sectionTitle: { color: Brand.navy, fontSize: 18, fontWeight: '800', marginLeft: 10 },
+  stopCount: { color: Brand.textMuted, fontSize: 12, marginLeft: 'auto' },
   stopRow: {
-    paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
+    padding: 13,
+    marginTop: 7,
+    backgroundColor: Brand.surface,
+    borderWidth: 1,
+    borderColor: Brand.border,
+    borderRadius: 14,
     flexDirection: 'row',
     justifyContent: 'space-between',
+    alignItems: 'center',
   },
-  stopName: { fontSize: 16 },
-  chevron: { fontSize: 18, color: '#999' },
+  stopIndex: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: Brand.surfaceMuted,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 10,
+  },
+  stopIndexText: { color: Brand.navy, fontSize: 11, fontWeight: '800' },
+  stopName: { color: Brand.text, fontSize: 14, fontWeight: '600', flex: 1 },
+  loadingState: {
+    flex: 1,
+    backgroundColor: Brand.cream,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  loadingText: { color: Brand.textMuted, marginTop: 12 },
+  emptyState: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 },
+  emptyTitle: { color: Brand.navy, fontSize: 19, fontWeight: '800', marginTop: 12 },
+  emptyText: { color: Brand.textMuted, marginTop: 5, textAlign: 'center' },
 });
